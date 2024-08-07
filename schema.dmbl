@@ -1,0 +1,31 @@
+Project BotCBot {
+  database_type: "SQLite"
+}
+
+// Table for managing different servers or game instances
+Table Servers {
+  ServerID TEXT [primary key, unique, not null]
+  TownSquareChannelID TEXT
+  NightChannelID TEXT
+}
+
+// Table for defining roles available in the game
+Table Roles {
+  RoleName TEXT [primary key, unique, not null]
+  Team INT [not null]  // -2 = Demon, -1 = Minion, 1 = Townsfolk, 2 = Outsider, 0 = StoryTeller
+}
+
+// Table for tracking players and their assigned roles within a specific server
+Table Game {
+  PlayerID TEXT [primary key, not null]
+  ServerID TEXT [primary key, not null, ref: > Servers.ServerID] // Foreign key referencing Servers table
+  RoleName TEXT [not null, ref: > Roles.RoleName] // Foreign key referencing Roles table
+}
+
+// Table for managing the relationship between players and servers
+Table PlayerInServer {
+  PlayerID TEXT [primary key, not null]
+  ServerID TEXT [primary key, not null, ref: > Servers.ServerID] // Foreign key referencing Servers table
+  NightChannelID TEXT
+
+}
