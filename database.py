@@ -23,17 +23,20 @@ class _Database():
     # General Subroutines
 
     def _SQLCommand(self, command):  # Connect and perform an SQL Command
+        print(f"SQL REQUEST | {command}\nRESPONSE |", end=" ")
         # conn = sql.connect(**self.__config)
         conn = sql.connect(f"{self.__config['database']}.db")
         # c = conn.cursor(dictionary=True)
+        conn.row_factory = sql.Row
         c = conn.cursor()
         # c.execute(f"""START TRANSACTION;""")
         c.execute(f"""BEGIN TRANSACTION;""")
         c.execute(f"""{command};""")
-        data = c.fetchall()
+        rows = (c.fetchall())
+        data = [dict(row) for row in rows]
+        print(str(data))
         c.execute(f"""COMMIT;""")
         conn.close()
-        print(f"SQL REQUEST | {command}\nRESPONSE | {str(data)}")
         return data
 
     def _ProtectFromInjection(self, rawValue):
@@ -61,7 +64,7 @@ class Entity():
 
     def _Create(self, data={}):
         # query = f"INSERT IGNORE INTO `{self._TableName}`"
-        query = f"INSERT OR REPLACE`{self._TableName}`"
+        query = f"INSERT OR IGNORE INTO `{self._TableName}`"
         attributes = []
         values = []
         for attribute, value in data.items():
@@ -83,7 +86,7 @@ class Entity():
         if filters:
             query += " WHERE " + " AND ".join(filters)
         results = self._Database._SQLCommand(query)
-        return results
+        return results[0]
 
     def _Update(self, atributes={}, conditions={}):
         query = f"UPDATE `{self._TableName}`"
@@ -127,14 +130,12 @@ class Entity():
 class BotCBot(_Database):
     def __init__(self):
         super().__init__("botcbot", "localhost")
-        self._Tables = {
+        self._Tables: dict[str,Entity] = {
                     "Servers": Servers(self),
-                    "Roles": Roles(self),
-                    "Game": Game(self),
-                    "PlayersInServer": PlayersInServer(self)
+                    "Players": Players(self)
                 }
         
-    def get_table(self, name=None):
+    def get_table(self, name=None)-> Entity | dict[str,Entity]:
         if name is None:
             return self._Tables
         return self._Tables.get(name, self._Tables)
@@ -143,40 +144,18 @@ class BotCBot(_Database):
 class Servers(Entity):
     def __init__(self, database):
         super().__init__(database, """
-        `ServerID` TEXT NOT NULL UNIQUE,
-        `TownSquareChannelID` TEXT,
-        `NightChannelID` TEXT,
+        `ServerID` INT NOT NULL UNIQUE,
+        `TownSquareChannelID` INT,
+        `CurrentlyPlayingRoleID` INT,
+        `StorytellerRoleID` INT,
         PRIMARY KEY (`ServerID`)""")
 
-
-class Roles(Entity):
+class Players(Entity):
     def __init__(self, database):
         super().__init__(database, """
-        `RoleName` TEXT NOT NULL UNIQUE,
-        `Team` INT NOT NULL, 
-        PRIMARY KEY (`RoleName`)""")
-        # Team Info
-        # -2 = Demon, -1 = Minion
-        # 1 = Townsfolk, 2 = Outsider
-        # 0 = StoryTeller
-
-
-class Game(Entity):
-    def __init__(self, database):
-        super().__init__(database, """
-        `PlayerID` TEXT NOT NULL,
-        `RoleName` TEXT,
-        `ServerID` TEXT NOT NULL,
-        FOREIGN KEY (`RoleName`) REFERENCES Roles(`RoleName`),
-        FOREIGN KEY (`ServerID`) REFERENCES Servers(`ServerID`),
-        PRIMARY KEY (`PlayerID`, `ServerID`)""")
-
-class PlayersInServer(Entity):
-    def __init__(self, database):
-        super().__init__(database, """
-        `PlayerID` TEXT NOT NULL,
-        `ServerID` TEXT NOT NULL,
-        `NightChannelID` TEXT,
+        `PlayerID` INT NOT NULL,
+        `ServerID` INT NOT NULL,
+        `NightChannelID` INT,
         FOREIGN KEY (`ServerID`) REFERENCES Servers(`ServerID`),
         PRIMARY KEY (`PlayerID`, `ServerID`)""")
 
