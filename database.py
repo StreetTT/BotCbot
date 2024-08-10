@@ -148,6 +148,7 @@ class Servers(Entity):
         `TownSquareChannelID` INT,
         `CurrentlyPlayingRoleID` INT,
         `StorytellerRoleID` INT,
+        `StorytellerChannelID` INT,
         PRIMARY KEY (`ServerID`)""")
 
 class Players(Entity):
