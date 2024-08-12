@@ -1,20 +1,23 @@
 import sqlite3 as sql
 from datetime import datetime
 
+# # All double comments like this one are for when I make the eventual switch to MySQL 
+# # (My laptop doesn't have enough space that I can confidently run it without fear of crashing every 2 minutes)
+
 
 class _Database():
     def __init__(self, name, host):  # Connect and create database
         self.__config = {}
-        # self.__config.update("host": host,
-        #                  "user": getenv(f"DB_{name.upper()}_USER"),
-        #                  "password": getenv(f"DB_{name.upper()}_PASS")})
+        # # self.__config.update("host": host,
+        # #                  "user": getenv(f"DB_{name.upper()}_USER"),
+        # #                  "password": getenv(f"DB_{name.upper()}_PASS")})
         self.__config.update({"database": name.lower()})
-        # conn = sql.connect(**self.__config)
+        # # conn = sql.connect(**self.__config)
         conn = sql.connect(f"{self.__config['database']}.db")
         conn.row_factory = sql.Row
         c = conn.cursor()
-        # c = conn.cursor(dictionary=True)
-        # c.execute(f"CREATE DATABASE IF NOT EXISTS {name.lower()};")
+        # # c = conn.cursor(dictionary=True)
+        # # c.execute(f"CREATE DATABASE IF NOT EXISTS {name.lower()};")
         conn.close()
 
     def _GetName(self):
@@ -24,12 +27,12 @@ class _Database():
 
     def _SQLCommand(self, command):  # Connect and perform an SQL Command
         print(f"SQL REQUEST | {command}\nRESPONSE |", end=" ")
-        # conn = sql.connect(**self.__config)
+        # # conn = sql.connect(**self.__config)
         conn = sql.connect(f"{self.__config['database']}.db")
-        # c = conn.cursor(dictionary=True)
+        # # c = conn.cursor(dictionary=True)
         conn.row_factory = sql.Row
         c = conn.cursor()
-        # c.execute(f"""START TRANSACTION;""")
+        # # c.execute(f"""START TRANSACTION;""")
         c.execute(f"""BEGIN TRANSACTION;""")
         c.execute(f"""{command};""")
         rows = (c.fetchall())
@@ -63,7 +66,7 @@ class Entity():
     # CRUD
 
     def _Create(self, data={}):
-        # query = f"INSERT IGNORE INTO `{self._TableName}`"
+        # # query = f"INSERT IGNORE INTO `{self._TableName}`"
         query = f"INSERT OR IGNORE INTO `{self._TableName}`"
         attributes = []
         values = []

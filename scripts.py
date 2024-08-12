@@ -1,10 +1,10 @@
 from roles import *
 
 class Script:
-    def __init__(self,playerInfo, possibleRoles, drunk) -> None:
+    def __init__(self,playerInfo, possibleRoles) -> None:
         self.playerInfo = playerInfo
-        self.possibleRoles: list[Player] = possibleRoles
-        self.drunkAmongUs = drunk
+        self.possibleRoles: list[Player] = possibleRoles 
+        self.drunkAmongUs = Drunk in possibleRoles
     
     def __str__(self):
         return self.__class__.__name__
@@ -46,5 +46,5 @@ class TroubleBrewing(Script):
             ScarletWoman,
             Baron,
             Imp
-        ], True
+        ]
     )

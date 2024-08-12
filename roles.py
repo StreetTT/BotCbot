@@ -9,7 +9,7 @@ class Player:
         self.alive = True
         self.ghostVote = True
         self.drunk = False
-        self.game: "Game" = None
+        self.game = None
         self.tokens = {}
         self.roleTokens = []
 
@@ -199,7 +199,7 @@ class ScarletWoman(Player):
         super().__init__(-1)
     
     def help(self):
-        return "If there are 5 or more players alive (Travellers don’t count) & the Demon dies, you become the Demon."
+        return "If there are 5 or more players alive (Travellers don't count) & the Demon dies, you become the Demon."
 
 class Baron(Player):
     def __init__(self) -> None:
