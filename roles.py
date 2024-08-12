@@ -1,43 +1,86 @@
+from random import randint
+
 class Player:
     def __init__(self, team) -> None:
         self.team = team # Team Info
         # -2 = Demon, -1 = Minion
         # 1 = Townsfolk, 2 = Outsider
         # 0 = StoryTeller
-        self.reset()
+        self.alive = True
+        self.ghostVote = True
+        self.drunk = False
+        self.game: "Game" = None
+        self.tokens = {}
+        self.roleTokens = []
 
     def __str__(self):
         return f"{'Drunk ' if self.drunk else ''}{self.__class__.__name__}"
+    
+    def name(self):
+        return self.__class__.__name__
 
     def ability(self):
         pass
     
-    def reset(self):
-        self.alive = True
-        self.ghostVote = True
-        self.drunk = False
-        self.game = None
+    def help(self):
+        pass
+    
+    def perform_ability(self):
+        if self.drunk:
+            return "Oh let's 'ave a likle drink *hickup*"
+        return self.ability()
+
+    def topFloor(self):
+        players = []
+        while len(players) != 2:
+            for id,role in self.game.players.items():
+                if role.tokens.get((self.name().lower() + "Right"), False):
+                    folk = role.name()
+                    players.append(id)
+                
+                elif role.tokens.get((self.name().lower() + "Wrong"), False):
+                    players.append(id)
+        x = randint(0,1)
+        return f"Either <@{players[x]}> or <@{players[0 if x else 1]}> is a {folk}"
 
 class Washerwoman(Player):
     def __init__(self) -> None:
         super().__init__(1)
+        for token in ("Right", "Wrong"):
+            self.roleTokens.append(self.name().lower() + token)
     
     def help(self):
         return "You start knowing that 1 of 2 players is a particular Townsfolk."
+    
+    def ability(self):
+        return self.topFloor()
 
 class Librarian(Player):
     def __init__(self) -> None:
         super().__init__(1)
+        for token in ("Right", "Wrong"):
+            self.roleTokens.append(self.name().lower() + token)
     
     def help(self):
         return "You start knowing that 1 of 2 players is a particular Outsider. (Or that zero are in play.)"
+    
+    def ability(self):
+        if self.game.characterCount[1] == 0:
+            return "There are 0 Outsiders in play"
+        return self.topFloor()
+        
 
 class Investigator(Player):
     def __init__(self) -> None:
         super().__init__(1)
+        for token in ("Right", "Wrong"):
+            self.roleTokens.append(self.name().lower() + token)
     
     def help(self):
         return "You start knowing that 1 of 2 players is a particular Minion."
+    
+    def ability(self):
+        return self.topFloor()
 
 class Chef(Player):
     def __init__(self) -> None:
@@ -65,14 +108,14 @@ class Undertaker(Player):
         super().__init__(1)
     
     def help(self):
-        return "Each night*, you learn which character died by execution today."
+        return "Each night (excluding the first), you learn which character died by execution today."
 
 class Monk(Player):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
-        return "Each night*, choose a player (not yourself): they are safe from the Demon tonight."
+        return "Each night (excluding the first), choose a player (not yourself): they are safe from the Demon tonight."
 
 class Ravenkeeper(Player):
     def __init__(self) -> None:
@@ -170,4 +213,4 @@ class Imp(Player):
         super().__init__(-2)
     
     def help(self):
-        return "Each night*, choose a player: they die. If you kill yourself this way, a Minion becomes the Imp."
+        return "Each night (excluding the first), choose a player: they die. If you kill yourself this way, a Minion becomes the Imp."

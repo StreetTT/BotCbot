@@ -1,7 +1,7 @@
 from roles import *
 
 class Script:
-    def __init__(self,playerInfo, possibleRoles, drunk  ) -> None:
+    def __init__(self,playerInfo, possibleRoles, drunk) -> None:
         self.playerInfo = playerInfo
         self.possibleRoles: list[Player] = possibleRoles
         self.drunkAmongUs = drunk
@@ -38,6 +38,7 @@ class TroubleBrewing(Script):
             Soldier,
             Mayor,
             Butler,
+            Drunk,
             Recluse,
             Saint,
             Poisoner,
