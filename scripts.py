@@ -3,11 +3,17 @@ from roles import *
 class Script:
     def __init__(self,playerInfo, possibleRoles) -> None:
         self.playerInfo = playerInfo
-        self.possibleRoles: list[Player] = possibleRoles 
+        self.possibleRoles: list[Role] = possibleRoles 
         self.drunkAmongUs = Drunk in possibleRoles
     
     def __str__(self):
         return self.__class__.__name__
+    
+    def minPlayers(self):
+        return min(self.playerInfo)
+    
+    def maxPlayers(self):
+        return max(self.playerInfo)
 
 class TroubleBrewing(Script):
     def __init__(self) -> None:

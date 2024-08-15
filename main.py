@@ -2,6 +2,7 @@ from database import BotCBot
 from scripts import *
 import discord
 from discord.ext import commands
+from players import PlayerList
 
 msgctx = tuple[int, str, bool]       
 
@@ -10,7 +11,7 @@ class Game:
         self.serverID = server_id
         self.started = False
         self.locked = False
-        self.players:dict[int, Player] = {}
+        self.players = PlayerList()
         self.storyteller = None
         self.db = BotCBot()
         self.db.get_table('Servers')._Create({
@@ -62,7 +63,7 @@ class Game:
     
     def set_script(self):
         self.maxCharacterCount = self.script.playerInfo.get(
-            len(list(self.players.keys())),
+            len(self.players),
             self.script.playerInfo[15]
         )
 
@@ -74,11 +75,11 @@ class Game:
         elif self.locked:
             return (0, "Ask your storyteller to unlock the game", False)
         
-        elif ctx.author.id in list(self.players.keys()):
-            self.players.pop(ctx.author.id)       
+        elif self.players.search(id=ctx.author.id):
+            self.players.remove(ctx.author.id)
             return (2, f"{str(ctx.author)} is no longer playing", False)
         
-        self.players.update({ctx.author.id: None})
+        self.players.append(ctx.author.id)
         self.db.get_table('Players')._Create({'PlayerID': ctx.author.id, 'ServerID': self.serverID})
         return (1, f"{str(ctx.author)} is now playing", False)
 
@@ -112,13 +113,13 @@ class Game:
         elif self.storyteller == None:
             return (0, "Game doesn't have storyteller", False)
         
-        elif len(list(self.players.keys())) < 5:
+        elif len(self.players) < self.script.minPlayers():
             return (0, 'There are not enough players', False)
         
-        elif len(list(self.players.keys())) > 20:
+        elif len(self.players) > self.script.maxPlayers():
             return (0, 'There are too many players', False)
         
-        elif [role for role in list(self.players.items()) if role == None]:
+        elif any(player.role is None for player in self.players):
             return (0, 'Not all players have been assigned a role', False)
         
         self.started = True
@@ -133,12 +134,13 @@ class Game:
         if self.started:
             return (0, "Game has already started", False)
         
-        elif user.id not in list(self.players.keys()):
+        elif not self.players.search(id=user.id):
             return (0, f"{user} is not playing", False)
         
-        elif str(self.players[user.id]) == roleName:
-            role = self.players[user.id]
-            self.players[user.id] = None
+        usersPlayer = self.players.search(id=user.id)
+        if str(usersPlayer.role) == roleName:
+            role = usersPlayer.role
+            usersPlayer.role = None
             if role.team == -2:
                 self.characterCount[3] -= 1
             
@@ -152,43 +154,43 @@ class Game:
                 self.characterCount[0] -= 1
 
             self.activeTokens = [token for token in self.activeTokens if not token.startswith(role.name().lower())]
-            for player in self.players.values():
-                if player != None:
-                    for token in player.tokens.keys():
+            for player in self.players:
+                if player.role != None:
+                    for token in player.role.tokens.keys():
                         if token.startswith(role.name().lower()):
-                            player.tokens.update({token: False})
+                            player.role.tokens.update({token: False})
             return (1, f"{user.name} is no longer a {str(role)}", False)
         
         elif roleName == "Drunk":
-            if self.players[user.id] == None:
+            if usersPlayer.role == None:
                 return (0, f"To assign someone the drunk, assign them their fake role first", False)
              
             elif not self.script.drunkAmongUs:
                 return (0, f"{roleName} is not available in {str(self.script)}", False)
             
-            elif self.players[user.id].drunk:
-                self.players[user.id].drunk = False
+            elif usersPlayer.role.drunk:
+                usersPlayer.role.drunk = False
                 self.activeTokens = [token for token in self.activeTokens if "drunk"]
-                return (1, f"{user.name} is a Sober {str(self.players[user.id])}", False)
+                return (1, f"{user.name} is a Sober {str(usersPlayer.role)}", False)
             
-            elif [str(role) for role in list(self.players.values()) if role != None and role.drunk]:
+            elif any((player.role is not None and player.role.drunk) for player in self.players):
                 return (0, f"{roleName} is already assigned", False)
 
-            self.players[user.id].drunk = True
+            usersPlayer.role.drunk = True
             self.activeTokens.append("drunk")
-            return (1, f"{user.name} is a {str(self.players[user.id])}", False)
+            return (1, f"{user.name} is a {str(usersPlayer.role)}", False)
         
-        elif self.players[user.id] != None:
+        elif usersPlayer.role != None:
             return (0, f"{user} has a role already", False)
         
         elif roleName not in [str(role()) for role in self.script.possibleRoles]:
             return (0, f"{roleName} is not available in {str(self.script)}", False)
         
-        elif [str(role) for role in list(self.players.values()) if role != None and str(role) == roleName]:
+        elif any((player.role is not None and str(player.role) == roleName) for player in self.players):
             return (0, f"{roleName} is already assigned", False)
         
         for role in self.script.possibleRoles:
-            instanciatedRole: Player = role()
+            instanciatedRole: Role = role()
             if str(instanciatedRole) == roleName:
                 if instanciatedRole.team == -2:
                     if self.characterCount[3] != self.maxCharacterCount[3]:
@@ -213,7 +215,7 @@ class Game:
                         self.characterCount[0] += 1
                     else:
                         return (0, f"There are enough Townfolk in this game", False)
-                self.players.update({user.id: instanciatedRole})
+                usersPlayer.role = instanciatedRole
                 instanciatedRole.game = self
                 for token in instanciatedRole.roleTokens:
                     self.activeTokens.append(token)
@@ -228,21 +230,21 @@ class Game:
 
         grimoire = ""
         for player in self.players:
-            if self.players[player]:
-                grimoire += f'{f"<@{player}> is {("a " + str(self.players[player]))}\n"}'
-                currentTokens = [token for token, active in self.players[player].tokens.items() if active]
+            if player.role:
+                grimoire += f'{f"<@{str(player)}> is {("a " + str(player.role))}\n"}'
+                currentTokens = [token for token, active in player.role.tokens.items() if active]
                 if currentTokens:
                     grimoire += f"Tokens: {currentTokens}\n"
                 else: 
                     grimoire += f"\n"
             else:
-                grimoire += f'{f"<@{player}> is not assigned\n\n"}'
+                grimoire += f'{f"<@{str(player)}> is not assigned\n\n"}'
             grimoire += f"\n"
         grimoire += f"---\nDemon Bluff: {self.demonBluffs}"
         inactive_tokens = set(self.activeTokens)
         for token in self.activeTokens:
-            for role in self.players.values():
-                if role is not None and role.tokens.get(token, False):
+            for player in self.players:
+                if player.role is not None and player.role.tokens.get(token, False):
                     inactive_tokens.remove(token)
                     break
             
@@ -256,7 +258,7 @@ class Game:
     def roles(self, ctx: commands.Context, priv: bool) -> msgctx | list[msgctx]: 
         rolecall = ""
         for role in self.script.possibleRoles:
-            instanciatedRole: Player = role()
+            instanciatedRole: Role = role()
             rolecall += f'{f"`{str(instanciatedRole)}` : {instanciatedRole.help()}\n\n"}'
         return ((2 if priv else 1), rolecall, priv) 
 
@@ -272,13 +274,14 @@ class Game:
             ctx.message.delete()
             return (-1, f"`{ctx.message}`\nUse this command in the designated Storyteller Channel: <#{self.storytellerChannelID}>", True)
         
-        elif [role for role in list(self.players.values()) if role == None]:
+        elif [player.role for player in self.players if not player.role]:
             return (0, 'Not all players have been assigned a role', False)
         
         elif roleName not in [str(role()) for role in self.script.possibleRoles]:
             return (0, f"{roleName} is not available in {str(self.script)}", False)
         
-        elif self.players[user.id].name() == roleName:
+        usersPlayer = self.players.search(id=user.id)
+        if usersPlayer.role.name() == roleName:
                 return (0, f"You cannot give the {roleName} a {roleName} token", False)
         
         elif roleName in list(topsFloorInfo.keys()): 
@@ -286,29 +289,29 @@ class Game:
                 return (0, f"{roleName} doesn't have this token", False)
             
             elif token == "Right":
-                if self.players[user.id].tokens.get((roleName.lower() + "Right"), False):
+                if usersPlayer.role.tokens.get((roleName.lower() + "Right"), False):
                     taken = True
                 
-                elif self.players[user.id].team != topsFloorInfo[roleName][0]:
+                elif usersPlayer.role.team != topsFloorInfo[roleName][0]:
                     return (0, f"{user.name} must be a {topsFloorInfo[roleName][1]}", False)
                 
-                elif self.players[user.id].tokens.get((roleName.lower() + "Wrong"), False):
+                elif usersPlayer.role.tokens.get((roleName.lower() + "Wrong"), False):
                     return (0, f"{user.name} has a conflicting token", False)
 
                 elif [role for role in list(self.players.values()) if role != None and role.tokens.get((roleName.lower() + "Right"), False)]:
                     return (0, f"Another player already has this token", False)
             
             elif token == "Wrong":
-                if self.players[user.id].tokens.get((roleName.lower() + "Wrong"), False):
+                if usersPlayer.role.tokens.get((roleName.lower() + "Wrong"), False):
                     taken = True
                 
-                elif self.players[user.id].tokens.get((roleName.lower() + "Right"), False):
+                elif usersPlayer.role.tokens.get((roleName.lower() + "Right"), False):
                     return (0, f"{user.name} has a conflicting token", False)
                 
-                elif [role for role in list(self.players.values()) if role != None and  role.tokens.get((roleName.lower() + "Wrong"), False)]:
+                elif [player.role for player in self.players if player.role and player.role.tokens.get((roleName.lower() + "Wrong"), False)]:
                     return (0, f"Another player already has this token", False)
             
-            self.players[user.id].tokens.update({(roleName.lower() + token): not taken})
+            usersPlayer.role.tokens.update({(roleName.lower() + token): not taken})
             return (1,f"{user.name} {'no longer has' if taken else 'has been given'} the {roleName}'s {token} token",False)
                 
 

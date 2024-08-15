@@ -1,6 +1,6 @@
 from random import randint
 
-class Player:
+class Role:
     def __init__(self, team) -> None:
         self.team = team # Team Info
         # -2 = Demon, -1 = Minion
@@ -32,6 +32,7 @@ class Player:
 
     def topFloor(self):
         players = []
+        folk = None
         while len(players) != 2:
             for id,role in self.game.players.items():
                 if role.tokens.get((self.name().lower() + "Right"), False):
@@ -43,7 +44,7 @@ class Player:
         x = randint(0,1)
         return f"Either <@{players[x]}> or <@{players[0 if x else 1]}> is a {folk}"
 
-class Washerwoman(Player):
+class Washerwoman(Role):
     def __init__(self) -> None:
         super().__init__(1)
         for token in ("Right", "Wrong"):
@@ -55,7 +56,7 @@ class Washerwoman(Player):
     def ability(self):
         return self.topFloor()
 
-class Librarian(Player):
+class Librarian(Role):
     def __init__(self) -> None:
         super().__init__(1)
         for token in ("Right", "Wrong"):
@@ -70,7 +71,7 @@ class Librarian(Player):
         return self.topFloor()
         
 
-class Investigator(Player):
+class Investigator(Role):
     def __init__(self) -> None:
         super().__init__(1)
         for token in ("Right", "Wrong"):
@@ -82,133 +83,133 @@ class Investigator(Player):
     def ability(self):
         return self.topFloor()
 
-class Chef(Player):
+class Chef(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "You start knowing how many pairs of evil players there are."
 
-class Empath(Player):
+class Empath(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "Each night, you learn how many of your 2 alive neighbours are evil."
 
-class FortuneTeller(Player):
+class FortuneTeller(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "Each night, choose 2 players: you learn if either is a Demon. There is a good player that registers as a Demon to you."
 
-class Undertaker(Player):
+class Undertaker(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "Each night (excluding the first), you learn which character died by execution today."
 
-class Monk(Player):
+class Monk(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "Each night (excluding the first), choose a player (not yourself): they are safe from the Demon tonight."
 
-class Ravenkeeper(Player):
+class Ravenkeeper(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "If you die at night, you are woken to choose a player: you learn their character."
 
-class Virgin(Player):
+class Virgin(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "The 1st time you are nominated, if the nominator is a Townsfolk, they are executed immediately."
 
-class Slayer(Player):
+class Slayer(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "Once per game, during the day, publicly choose a player: if they are the Demon, they die."
 
-class Soldier(Player):
+class Soldier(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "You are safe from the Demon."
 
-class Mayor(Player):
+class Mayor(Role):
     def __init__(self) -> None:
         super().__init__(1)
     
     def help(self):
         return "If only 3 players live & no execution occurs, your team wins. If you die at night, another player might die instead."
 
-class Butler(Player):
+class Butler(Role):
     def __init__(self) -> None:
         super().__init__(2)
     
     def help(self):
         return "Each night, choose a player (not yourself): tomorrow, you may only vote if they are voting too."
 
-class Drunk(Player):
+class Drunk(Role):
     def __init__(self) -> None:
         super().__init__(2)
     
     def help(self):
         return "You do not know you are the Drunk. You think you are a Townsfolk character, but you are not."
 
-class Recluse(Player):
+class Recluse(Role):
     def __init__(self) -> None:
         super().__init__(2)
     
     def help(self):
         return "You might register as evil & as a Minion or Demon, even if dead."
 
-class Saint(Player):
+class Saint(Role):
     def __init__(self) -> None:
         super().__init__(2)
     
     def help(self):
         return "If you die by execution, your team loses."
 
-class Poisoner(Player):
+class Poisoner(Role):
     def __init__(self) -> None:
         super().__init__(-1)
     
     def help(self):
         return "Each night, choose a player: they are poisoned tonight and tomorrow day."
 
-class Spy(Player):
+class Spy(Role):
     def __init__(self) -> None:
         super().__init__(-1)
     
     def help(self):
         return "Each night, you see the Grimoire. You might register as good & as a Townsfolk or Outsider, even if dead."
 
-class ScarletWoman(Player):
+class ScarletWoman(Role):
     def __init__(self) -> None:
         super().__init__(-1)
     
     def help(self):
         return "If there are 5 or more players alive (Travellers don't count) & the Demon dies, you become the Demon."
 
-class Baron(Player):
+class Baron(Role):
     def __init__(self) -> None:
         super().__init__(-1)
     
     def help(self):
         return "There are extra Outsiders in play. [+2 Outsiders]"
 
-class Imp(Player):
+class Imp(Role):
     def __init__(self) -> None:
         super().__init__(-2)
     
