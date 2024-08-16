@@ -25,6 +25,14 @@ class PlayerList:
     
     def __len__(self):
         return self.size
+    
+    def __hash__(self):
+        return hash(self.player_id)
+    
+    def __eq__(self, other):
+        if isinstance(other, Player):
+            return self.player_id == other.player_id
+        return False
 
     def append(self, id, role=None):
         new_player = Player(id, role)

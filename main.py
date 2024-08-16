@@ -3,6 +3,7 @@ from scripts import *
 import discord
 from discord.ext import commands
 from players import PlayerList
+from tokens import Token, TokenManager
 
 msgctx = tuple[int, str, bool]       
 
@@ -12,6 +13,7 @@ class Game:
         self.started = False
         self.locked = False
         self.players = PlayerList()
+        self.tokens = TokenManager()
         self.storyteller = None
         self.db = BotCBot()
         self.db.get_table('Servers')._Create({
@@ -27,7 +29,6 @@ class Game:
         self.script: Script = TroubleBrewing()
         self.characterCount = [0,0,0,0]
         self.demonBluffs = []
-        self.activeTokens = []
 
     def setCurrentlyPlayingRoleID(self, id):
         self.currentlyPlayingRoleID = id
@@ -67,6 +68,31 @@ class Game:
             self.script.playerInfo[15]
         )
 
+    def tally_role(self, role, subtract = False):
+        x = -1 if subtract else 1
+        if role.team == -2:
+            if subtract or self.characterCount[3] != self.maxCharacterCount[3]:
+                self.characterCount[3] += x
+            else:
+                return (0, f"There are enough Demons in this game", False)
+        
+        elif role.team == -1:
+            if subtract or self.characterCount[2] != self.maxCharacterCount[2]:
+                self.characterCount[2] += x
+            else:
+                return (0, f"There are enough Minions in this game", False)
+        
+        elif role.team == 2:
+            if subtract or self.characterCount[1] != self.maxCharacterCount[1]:
+                self.characterCount[1] += x
+            else:
+                return (0, f"There are enough Outsiders in this game", False)
+        
+        elif role.team == 1:
+            if subtract or self.characterCount[0] != self.maxCharacterCount[0]:
+                self.characterCount[0] += x
+            else:
+                return (0, f"There are enough Townfolk in this game", False)
     
     def play(self, ctx: commands.Context) -> msgctx | list[msgctx]:
         if self.started:
@@ -141,24 +167,9 @@ class Game:
         if str(usersPlayer.role) == roleName:
             role = usersPlayer.role
             usersPlayer.role = None
-            if role.team == -2:
-                self.characterCount[3] -= 1
-            
-            elif role.team == -1:
-                self.characterCount[2] -= 1
-            
-            elif role.team == 2:
-                self.characterCount[1] -= 1
-            
-            elif role.team == 1:
-                self.characterCount[0] -= 1
-
-            self.activeTokens = [token for token in self.activeTokens if not token.startswith(role.name().lower())]
-            for player in self.players:
-                if player.role != None:
-                    for token in player.role.tokens.keys():
-                        if token.startswith(role.name().lower()):
-                            player.role.tokens.update({token: False})
+            self.tally_role(role, subtract=True)
+            for token in role.roleTokens:
+                self.tokens.removeToken(token)
             return (1, f"{user.name} is no longer a {str(role)}", False)
         
         elif roleName == "Drunk":
@@ -170,14 +181,14 @@ class Game:
             
             elif usersPlayer.role.drunk:
                 usersPlayer.role.drunk = False
-                self.activeTokens = [token for token in self.activeTokens if "drunk"]
+                self.tokens.revokeToken(Token(usersPlayer.role, "Drunk"))
                 return (1, f"{user.name} is a Sober {str(usersPlayer.role)}", False)
             
-            elif any((player.role is not None and player.role.drunk) for player in self.players):
+            elif any((player.role.drunk) for player in self.players):
                 return (0, f"{roleName} is already assigned", False)
 
             usersPlayer.role.drunk = True
-            self.activeTokens.append("drunk")
+            self.tokens.applyToken(usersPlayer, Token(usersPlayer.role, "Drunk"))
             return (1, f"{user.name} is a {str(usersPlayer.role)}", False)
         
         elif usersPlayer.role != None:
@@ -192,33 +203,13 @@ class Game:
         for role in self.script.possibleRoles:
             instanciatedRole: Role = role()
             if str(instanciatedRole) == roleName:
-                if instanciatedRole.team == -2:
-                    if self.characterCount[3] != self.maxCharacterCount[3]:
-                        self.characterCount[3] += 1
-                    else:
-                        return (0, f"There are enough Demons in this game", False)
-                
-                elif instanciatedRole.team == -1:
-                    if self.characterCount[2] != self.maxCharacterCount[2]:
-                        self.characterCount[2] += 1
-                    else:
-                        return (0, f"There are enough Minions in this game", False)
-                
-                elif instanciatedRole.team == 2:
-                    if self.characterCount[1] != self.maxCharacterCount[1]:
-                        self.characterCount[1] += 1
-                    else:
-                        return (0, f"There are enough Outsiders in this game", False)
-                
-                elif instanciatedRole.team == 1:
-                    if self.characterCount[0] != self.maxCharacterCount[0]:
-                        self.characterCount[0] += 1
-                    else:
-                        return (0, f"There are enough Townfolk in this game", False)
+                msg = self.tally_role(instanciatedRole)
+                if msg:
+                    return msg
                 usersPlayer.role = instanciatedRole
                 instanciatedRole.game = self
                 for token in instanciatedRole.roleTokens:
-                    self.activeTokens.append(token)
+                    self.tokens.addToken(token)
                 return (1, f"{user.name} is a {str(instanciatedRole)}", False) 
     
     def grimoire(self, ctx: commands.Context, ) -> msgctx | list[msgctx]: 
@@ -232,7 +223,7 @@ class Game:
         for player in self.players:
             if player.role:
                 grimoire += f'{f"<@{str(player)}> is {("a " + str(player.role))}\n"}'
-                currentTokens = [token for token, active in player.role.tokens.items() if active]
+                currentTokens = self.tokens.findPlayer(player)
                 if currentTokens:
                     grimoire += f"Tokens: {currentTokens}\n"
                 else: 
@@ -241,14 +232,7 @@ class Game:
                 grimoire += f'{f"<@{str(player)}> is not assigned\n\n"}'
             grimoire += f"\n"
         grimoire += f"---\nDemon Bluff: {self.demonBluffs}"
-        inactive_tokens = set(self.activeTokens)
-        for token in self.activeTokens:
-            for player in self.players:
-                if player.role is not None and player.role.tokens.get(token, False):
-                    inactive_tokens.remove(token)
-                    break
-            
-        grimoire += f"\nInactive Tokens: {list(inactive_tokens)}"
+        grimoire += f"\nInactive Tokens: {self.tokens.getInactiveTokens()}"
         return (1, grimoire, False) 
 
     def lock(self, ctx: commands.Context) -> msgctx | list[msgctx]: 
@@ -288,30 +272,39 @@ class Game:
             if token not in ("Right", "Wrong"):
                 return (0, f"{roleName} doesn't have this token", False)
             
-            elif token == "Right":
-                if usersPlayer.role.tokens.get((roleName.lower() + "Right"), False):
+
+            right_token = Token(role=roleName, name="Right")
+            wrong_token = Token(role=roleName, name="Wrong")
+            playersTokens = self.tokens.findPlayer(usersPlayer)
+            if token == "Right":
+                if right_token in playersTokens:
                     taken = True
-                
+
                 elif usersPlayer.role.team != topsFloorInfo[roleName][0]:
                     return (0, f"{user.name} must be a {topsFloorInfo[roleName][1]}", False)
-                
-                elif usersPlayer.role.tokens.get((roleName.lower() + "Wrong"), False):
-                    return (0, f"{user.name} has a conflicting token", False)
 
-                elif [role for role in list(self.players.values()) if role != None and role.tokens.get((roleName.lower() + "Right"), False)]:
+                elif wrong_token in playersTokens:
+                    return (0, f"{user.name} has a conflicting token", False)
+                
+                # If people already have the right_token token (We know user doesn't already)
+                elif self.tokens.findToken(right_token):
                     return (0, f"Another player already has this token", False)
-            
+
             elif token == "Wrong":
-                if usersPlayer.role.tokens.get((roleName.lower() + "Wrong"), False):
+                if wrong_token in playersTokens:
                     taken = True
                 
-                elif usersPlayer.role.tokens.get((roleName.lower() + "Right"), False):
+                elif right_token in playersTokens:
                     return (0, f"{user.name} has a conflicting token", False)
                 
-                elif [player.role for player in self.players if player.role and player.role.tokens.get((roleName.lower() + "Wrong"), False)]:
+                # If people already have the wrong_token token (We know user doesn't already)
+                elif self.tokens.findToken(wrong_token):
                     return (0, f"Another player already has this token", False)
             
-            usersPlayer.role.tokens.update({(roleName.lower() + token): not taken})
+            if taken:
+                self.tokens.revokeToken(usersPlayer, token)
+            else: 
+                self.tokens.applyToken(usersPlayer, token)
             return (1,f"{user.name} {'no longer has' if taken else 'has been given'} the {roleName}'s {token} token",False)
                 
 

@@ -1,4 +1,7 @@
 from random import randint
+from tokens import Token
+from players import Player
+from main import Game
 
 class Role:
     def __init__(self, team) -> None:
@@ -9,9 +12,8 @@ class Role:
         self.alive = True
         self.ghostVote = True
         self.drunk = False
-        self.game = None
-        self.tokens = {}
-        self.roleTokens = []
+        self.game: Game = None
+        self.roleTokens: list[Token] = []
 
     def __str__(self):
         return f"{'Drunk ' if self.drunk else ''}{self.__class__.__name__}"
@@ -31,24 +33,21 @@ class Role:
         return self.ability()
 
     def topFloor(self):
-        players = []
+        players: list[Player] = []
         folk = None
-        while len(players) != 2:
-            for id,role in self.game.players.items():
-                if role.tokens.get((self.name().lower() + "Right"), False):
-                    folk = role.name()
-                    players.append(id)
-                
-                elif role.tokens.get((self.name().lower() + "Wrong"), False):
-                    players.append(id)
+        for token in self.roleTokens:
+            player = self.game.tokens.findToken(token)[0]
+            if token.name == "Right":
+                folk = player.role
+            players.append(player)
         x = randint(0,1)
-        return f"Either <@{players[x]}> or <@{players[0 if x else 1]}> is a {folk}"
+        return f"Either <@{players[x].ID}> or <@{players[0 if x else 1].ID}> is a {str(folk)}"
 
 class Washerwoman(Role):
     def __init__(self) -> None:
         super().__init__(1)
         for token in ("Right", "Wrong"):
-            self.roleTokens.append(self.name().lower() + token)
+            self.roleTokens.append(Token(self, token))
     
     def help(self):
         return "You start knowing that 1 of 2 players is a particular Townsfolk."
@@ -60,7 +59,7 @@ class Librarian(Role):
     def __init__(self) -> None:
         super().__init__(1)
         for token in ("Right", "Wrong"):
-            self.roleTokens.append(self.name().lower() + token)
+            self.roleTokens.append(Token(self, token))
     
     def help(self):
         return "You start knowing that 1 of 2 players is a particular Outsider. (Or that zero are in play.)"
@@ -75,7 +74,7 @@ class Investigator(Role):
     def __init__(self) -> None:
         super().__init__(1)
         for token in ("Right", "Wrong"):
-            self.roleTokens.append(self.name().lower() + token)
+            self.roleTokens.append(Token(self, token))
     
     def help(self):
         return "You start knowing that 1 of 2 players is a particular Minion."
